@@ -10,10 +10,14 @@ import secrets
 import ops
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer
 from charms.parca.v0.parca_scrape import ProfilingEndpointProvider
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from zinc import Zinc
+
+AUTH_PROXY_ALLOWED_ENDPOINTS = ["healthz"]
+AUTH_PROXY_HEADERS = ["X-User"]
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,28 @@ class ZincCharm(ops.CharmBase):
             port=self._zinc.port,
             strip_prefix=True,
         )
+
+        self.framework.observe(self._ingress.on.ready, self._on_ingress_ready)
+
+        self.auth_proxy_relation_name = "auth-proxy"
+
+        self.auth_proxy = AuthProxyRequirer(self, self.auth_proxy_relation_name, self._auth_proxy_config)
+
+    @property
+    def _auth_proxy_config(self) -> AuthProxyConfig:
+        return AuthProxyConfig(
+            protected_urls=[self._ingress.url if self._ingress.url is not None else "https://some-test-url.com"],
+            headers=AUTH_PROXY_HEADERS,
+            allowed_endpoints=AUTH_PROXY_ALLOWED_ENDPOINTS,
+        )
+
+    def _configure_auth_proxy(self):
+        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self._auth_proxy_config)
+
+    def _on_ingress_ready(self, event) -> None:
+        if self.unit.is_leader():
+            logger.info(f"This app's ingress URL: {event.url}")
+        self._configure_auth_proxy()
 
     def _on_zinc_pebble_ready(self, event: ops.WorkloadEvent):
         """Define and start a workload using the Pebble API."""
