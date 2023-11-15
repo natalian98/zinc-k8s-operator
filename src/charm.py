@@ -16,7 +16,7 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from zinc import Zinc
 
-AUTH_PROXY_ALLOWED_ENDPOINTS = ["healthz"]
+AUTH_PROXY_ALLOWED_ENDPOINTS = ["version"]
 AUTH_PROXY_HEADERS = ["X-User"]
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class ZincCharm(ops.CharmBase):
 
         self.auth_proxy_relation_name = "auth-proxy"
 
-        self.auth_proxy = AuthProxyRequirer(self, self.auth_proxy_relation_name, self._auth_proxy_config)
+        self.auth_proxy = AuthProxyRequirer(self, self._auth_proxy_config, self.auth_proxy_relation_name)
 
     @property
     def _auth_proxy_config(self) -> AuthProxyConfig:
